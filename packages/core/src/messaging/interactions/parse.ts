@@ -33,11 +33,14 @@ export const MAX_FOLLOWUPS = 4;
 export const MAX_TASK_TITLE_LEN = 200;
 
 // Group 2 captures the header attributes (`id=…`, `allow_custom`) in any order.
-const CHOICE_RE = /\[CHOICE:([\w-]+)([^\]]*)\]\n([\s\S]*?)\n\[\/CHOICE\]/g;
+const CHOICE_RE =
+	/\[[ \t]*CHOICE:[ \t]*([\w-]+)([^\]]*)\]\n([\s\S]*?)\n\[[ \t]*\/[ \t]*CHOICE[ \t]*\]/g;
 const FOLLOWUPS_RE =
-	/\[FOLLOWUPS(?:\s+id=(\S+))?\]\n([\s\S]*?)\n\[\/FOLLOWUPS\]/g;
-const FORM_RE = /\[FORM\]\n([\s\S]*?)\n\[\/FORM\]/g;
-const TASK_RE = /\[TASK:([a-f0-9-]{8,64})\]([\s\S]*?)\[\/TASK\]/g;
+	/\[[ \t]*FOLLOWUPS(?:\s+id=(\S+))?[ \t]*\]\n([\s\S]*?)\n\[[ \t]*\/[ \t]*FOLLOWUPS[ \t]*\]/g;
+const FORM_RE =
+	/\[[ \t]*FORM[ \t]*\]\n([\s\S]*?)\n\[[ \t]*\/[ \t]*FORM[ \t]*\]/g;
+const TASK_RE =
+	/\[[ \t]*TASK:[ \t]*([a-f0-9-]{8,64})\]([\s\S]*?)\[[ \t]*\/[ \t]*TASK[ \t]*\]/g;
 
 const FIELD_TYPES: ReadonlySet<InteractionFieldType> = new Set([
 	"text",
@@ -295,9 +298,56 @@ export interface ParsedInteractions {
  * the markers stripped. The cleaned text is what a connector shows above the
  * native controls it renders from `blocks`.
  */
+/**
+ * Remove marker lines the parsers could not claim.
+ *
+ * The block regexes need an exact open/close pair. A model that emits one half,
+ * misspells the close tag, or invents spacing the regex misses leaves the
+ * marker in place — and it ships to the user as literal text. Live 2026-08-14, a
+ * Discord reply ended with a raw `[ FOLLOWUPS ]` block listing `reply:…=Label`
+ * lines, because the spaced variant did not match and nothing downstream
+ * removes an unclaimed marker.
+ *
+ * Keyed on the marker vocabulary, not on any one dialect: a line that is
+ * nothing but a bracketed interaction keyword is machinery by construction, and
+ * so are the `kind:payload=label` option lines that belong to one. Prose never
+ * looks like this, so dropping it cannot eat a real answer.
+ */
+// FORM is deliberately EXCLUDED. #14489 pins that a form whose fields were all
+// rejected (prototype-pollution names) keeps its raw text: a FORM carries user
+// DATA, and silently deleting it loses something the caller may still need.
+// FOLLOWUPS/CHOICE/TASK are passive affordances — dropping an unrenderable chip
+// costs nothing, while shipping it costs the user a face full of machinery.
+const UNCLAIMED_MARKER_LINE =
+	/^[ \t]*\[[ \t]*\/?[ \t]*(?:FOLLOWUPS|CHOICE|TASK)\b[^\]]*\][ \t]*$/i;
+const ORPHAN_OPTION_LINE = /^[ \t]*(?:reply|value|action|url):[^\n]*=[^\n]*$/i;
+
+function stripUnclaimedMarkers(text: string): string {
+	if (!/\[[ \t]*\/?[ \t]*(?:FOLLOWUPS|CHOICE|TASK)\b/i.test(text)) {
+		return text;
+	}
+	const kept: string[] = [];
+	let insideOrphanBlock = false;
+	for (const line of text.split("\n")) {
+		if (UNCLAIMED_MARKER_LINE.test(line)) {
+			insideOrphanBlock = !/\[[ \t]*\//.test(line);
+			continue;
+		}
+		if (insideOrphanBlock && ORPHAN_OPTION_LINE.test(line)) continue;
+		insideOrphanBlock = false;
+		kept.push(line);
+	}
+	return kept.join("\n");
+}
+
 export function parseInteractionBlocks(text: string): ParsedInteractions {
 	const regions = findInteractionRegions(text);
-	if (regions.length === 0) return { blocks: [], cleanedText: text };
+	// No claimable region is the LEAK path, not the safe one: a half-open or
+	// misspelled marker parses to nothing and the old early return handed the
+	// raw text straight to the user. Sweep residue before returning.
+	if (regions.length === 0) {
+		return { blocks: [], cleanedText: stripUnclaimedMarkers(text) };
+	}
 	const blocks: InteractionBlock[] = [];
 	const parts: string[] = [];
 	let cursor = 0;
@@ -307,8 +357,7 @@ export function parseInteractionBlocks(text: string): ParsedInteractions {
 		cursor = r.end;
 	}
 	if (cursor < text.length) parts.push(text.slice(cursor));
-	const cleanedText = parts
-		.join("")
+	const cleanedText = stripUnclaimedMarkers(parts.join(""))
 		.replace(/\n{3,}/g, "\n\n")
 		.trim();
 	return { blocks, cleanedText };
