@@ -79,6 +79,7 @@ import { apiKeysService } from "./api-keys";
 import { chatSseFrame, normalizeChatSseDonePayload } from "./chat-sse-frames";
 import { imageRequiresDigestPin, isCodingContainerImageAllowed } from "./coding-containers";
 import type { CreditReconciliationResult, CreditReservation } from "./credits";
+import { withDefaultAgentCharacter } from "./default-agent-character";
 import { holdsCountedNodeSlot, isDeletionContinuation } from "./docker-node-workload-queries";
 import type { DockerSandboxMetadata } from "./docker-sandbox-provider";
 import { shellQuote } from "./docker-sandbox-utils";
@@ -229,12 +230,18 @@ export class AgentQuotaExceededError extends Error {
  * function so config sanitization, character ownership, tier→status derivation,
  * and column defaults cannot drift between paths. `environmentVars` is expected
  * storage-ready (already passed through `encryptAgentEnvVarsForStorage`).
+ *
+ * A create that brings neither a linked `characterId` nor a persona in its
+ * config is seeded with the shipped default character
+ * ({@link withDefaultAgentCharacter}); seeding here rather than in any single
+ * reader is what keeps the shared turn, the dedicated container, the warm-pool
+ * claim push, and the first-boot bootstrap agreeing on one persona.
  */
 export function buildAgentSandboxInsertValues(params: CreateAgentParams): NewAgentSandbox {
   const sanitizedConfig = stripReservedElizaConfigKeys(params.agentConfig);
   const agentConfig = params.characterId
     ? withReusedElizaCharacterOwnership(sanitizedConfig)
-    : sanitizedConfig;
+    : withDefaultAgentCharacter(sanitizedConfig);
 
   const executionTier: AgentExecutionTier = params.executionTier ?? "shared";
   const status = executionTier === "shared" ? "running" : "pending";
