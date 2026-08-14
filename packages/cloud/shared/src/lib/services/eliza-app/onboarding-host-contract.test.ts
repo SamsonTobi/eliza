@@ -1,7 +1,7 @@
 /**
- * Deployment contract for the onboarding frontend origins. The messaging
- * continuation Connect CTA (`/get-started`) and the dashboard/billing links now
- * both live on the Cloud app: the CTA opens the app's authenticated
+ * Deployment contract for onboarding frontend origins. The messaging
+ * continuation Connect CTA (`/get-started`) and dashboard links live on the
+ * canonical Cloud app: the CTA opens the app's authenticated
  * `/get-started`, which sends signed-out users straight into Steward login and
  * hands back to Discord, so there is no intermediate homepage sign-in card.
  *
@@ -16,6 +16,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { ELIZA_DOMAIN_CONTRACTS, LEGACY_ELIZA_DOMAIN_CONTRACTS } from "@elizaos/shared/elizacloud";
 import { runWithCloudBindingsAsync } from "../../runtime/cloud-bindings";
 import {
   type OnboardingSession,
@@ -95,11 +96,7 @@ async function resolveOnboardingOrigins(
 }
 
 /**
- * `appOrigin` is the Eliza *app* host, never the console apex: production pins
- * app.elizacloud.ai while its NEXT_PUBLIC_APP_URL is the apex elizacloud.ai, and
- * staging's peer of that app host is app-staging.elizacloud.ai (the `eliza-app`
- * Pages domain, same environment-peer rule as STAGING_ELIZA_APP_ORIGIN in
- * packages/ui/src/utils/cloud-agent-base.ts).
+ * `appOrigin` is the canonical Cloud app host, never the marketing origin.
  *
  * `loginOrigin` is the messaging-continuation Connect CTA target. It now equals
  * the Cloud *app* host: the CTA points at the app's authenticated
@@ -116,22 +113,31 @@ const ONBOARDING_HOST_CONTRACT: ReadonlyArray<{
 }> = [
   {
     section: "vars",
-    loginOrigin: "https://app.elizacloud.ai",
-    appOrigin: "https://app.elizacloud.ai",
+    loginOrigin: ELIZA_DOMAIN_CONTRACTS.production.cloudAppOrigin,
+    appOrigin: ELIZA_DOMAIN_CONTRACTS.production.cloudAppOrigin,
   },
   {
     section: "env.production.vars",
-    loginOrigin: "https://app.elizacloud.ai",
-    appOrigin: "https://app.elizacloud.ai",
+    loginOrigin: ELIZA_DOMAIN_CONTRACTS.production.cloudAppOrigin,
+    appOrigin: ELIZA_DOMAIN_CONTRACTS.production.cloudAppOrigin,
   },
   {
     section: "env.staging.vars",
-    loginOrigin: "https://app-staging.elizacloud.ai",
-    appOrigin: "https://app-staging.elizacloud.ai",
+    loginOrigin: ELIZA_DOMAIN_CONTRACTS.staging.cloudAppOrigin,
+    appOrigin: ELIZA_DOMAIN_CONTRACTS.staging.cloudAppOrigin,
   },
 ];
 
-const PRODUCTION_APP_ORIGINS = ["https://app.elizacloud.ai", "https://elizacloud.ai"];
+const PRODUCTION_APP_ORIGINS = [
+  ELIZA_DOMAIN_CONTRACTS.production.cloudAppOrigin,
+  ELIZA_DOMAIN_CONTRACTS.production.marketingOrigin,
+  ...LEGACY_ELIZA_DOMAIN_CONTRACTS.production.cloudAppHostnames.map(
+    (hostname) => `https://${hostname}`,
+  ),
+  ...LEGACY_ELIZA_DOMAIN_CONTRACTS.production.marketingHostnames.map(
+    (hostname) => `https://${hostname}`,
+  ),
+];
 
 describe("onboarding host deployment contract", () => {
   test.each(ONBOARDING_HOST_CONTRACT)(
@@ -150,8 +156,8 @@ describe("onboarding host deployment contract", () => {
       // The Steward-login handoff lives on the Cloud app, so login and app
       // origins coincide by design; neither is the homepage (eliza.app).
       expect(resolved.loginOrigin).toBe(appOrigin);
-      expect(resolved.loginOrigin).not.toBe("https://eliza.app");
-      expect(resolved.loginOrigin).not.toBe("https://staging.eliza.app");
+      expect(resolved.loginOrigin).not.toBe(ELIZA_DOMAIN_CONTRACTS.production.marketingOrigin);
+      expect(resolved.loginOrigin).not.toBe(ELIZA_DOMAIN_CONTRACTS.staging.marketingOrigin);
     },
   );
 
@@ -167,10 +173,11 @@ describe("onboarding host deployment contract", () => {
 
   test("the staging section pins the app origin instead of inheriting one", () => {
     const staging = environmentBindings("env.staging.vars");
-    // Resolution alone cannot tell a pin from a fallback: NEXT_PUBLIC_APP_URL
-    // would answer for ELIZA_ONBOARDING_APP_URL and quietly hand back the
-    // console apex the moment the explicit key is dropped.
-    expect(staging.ELIZA_ONBOARDING_APP_URL).toBe("https://app-staging.elizacloud.ai");
-    expect(staging.NEXT_PUBLIC_APP_URL).toBe("https://staging.elizacloud.ai");
+    // Both bindings intentionally resolve to the Cloud app now, so value
+    // equality cannot prove that the onboarding-specific deployment key is
+    // present. Keep the own-property assertion as the pinning contract.
+    expect(Object.hasOwn(staging, "ELIZA_ONBOARDING_APP_URL")).toBe(true);
+    expect(staging.ELIZA_ONBOARDING_APP_URL).toBe(ELIZA_DOMAIN_CONTRACTS.staging.cloudAppOrigin);
+    expect(staging.NEXT_PUBLIC_APP_URL).toBe(ELIZA_DOMAIN_CONTRACTS.staging.cloudAppOrigin);
   });
 });
