@@ -131,6 +131,47 @@ function entitySummary(entity: Entity): {
 
 const ENTITY_KINDS_DEFAULT = "person";
 
+function entityCount(n: number, capped: boolean): string {
+  return `${n}${capped ? "+" : ""} entit${n === 1 && !capped ? "y" : "ies"}`;
+}
+
+/**
+ * Render the `list` op's summary so the narrowing is never invisible.
+ *
+ * `entityStore.list` is scoped by the caller's `kind` and capped at `limit`, so
+ * a bare "N entities in the graph" turns a filtered page into an apparent
+ * total and a filtered miss into an apparently empty graph. The text names the
+ * kind filter, marks a page-filling result as capped, and — when a
+ * kind-filtered read came back empty — reports the measured unfiltered count so
+ * the reader can tell "no organizations" from "no graph".
+ */
+function listScopeText(args: {
+  entities: readonly Entity[];
+  kind: string | null;
+  limit: number;
+  unfiltered: readonly Entity[] | null;
+}): string {
+  const { entities, kind, limit, unfiltered } = args;
+  if (entities.length > 0) {
+    const capped = entities.length >= limit;
+    const scope = kind ? ` of kind "${kind}"` : "";
+    const cap = capped
+      ? ` (capped at ${limit} — raise \`limit\` to see more)`
+      : "";
+    return `${entityCount(entities.length, capped)}${scope} in the graph${cap}.`;
+  }
+  if (!kind) {
+    return "No entities in the graph yet.";
+  }
+  if (!unfiltered || unfiltered.length === 0) {
+    return `No entities of kind "${kind}" — the graph holds no entities of any kind yet.`;
+  }
+  return `No entities of kind "${kind}". The graph holds ${entityCount(
+    unfiltered.length,
+    unfiltered.length >= limit,
+  )} of other kinds — list without \`kind\` to see them.`;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -164,7 +205,24 @@ function resolveTrustedIdentityVerification(
 
 export const entityAction: Action = {
   name: RELATIONSHIPS_ACTION_NAME,
-  similes: ["ENTITY_CRUD", "GRAPH_ENTITY", "KNOWLEDGE_GRAPH_CRUD"],
+  // The description below is written in implementation vocabulary ("CRUD over
+  // entities + typed edges"), which no user says. Without people-language the
+  // action never ranked into retrieval, so relationship questions fell through
+  // to CONTACT and the graph was never consulted (live capture).
+  similes: [
+    "ENTITY_CRUD",
+    "GRAPH_ENTITY",
+    "KNOWLEDGE_GRAPH_CRUD",
+    "WHO_IS",
+    "WHO_DO_I_KNOW",
+    "HOW_DO_I_KNOW",
+    "RELATIONSHIP",
+    "SOCIAL_GRAPH",
+    "REMEMBER_PERSON",
+    "WHO_IS_RELATED",
+  ],
+  routingHint:
+    'who a person IS to the user and how people are connected -> KNOWLEDGE_GRAPH. Use it to record a durable relationship fact ("alex is my cofounder", "sam is my sister", "we met at ethdenver") via set_relationship/set_identity, and to answer "who do i know", "how do i know X", "how are X and Y connected", "who works at Z" via read/list. A person-and-relationship fact is NOT a note: notes are undated free text, this is the entity graph. Contact orchestration — outreach, follow-ups, planning a touchpoint -> CONTACT/ENTITY in personal-assistant.',
   description:
     "Direct CRUD over the runtime knowledge graph (entities + typed edges): create | read | list | log_interaction | set_identity | set_relationship | merge. Backs the relationships viewer. Contact orchestration with planning -> ENTITY (personal-assistant).",
   descriptionCompressed:
@@ -307,12 +365,17 @@ export const entityAction: Action = {
           ...(kind ? { type: kind } : {}),
           limit,
         });
+        // A `kind`-filtered miss is not an empty graph, and a page-filling
+        // result is not a total. Both narrowings are named in the text, and an
+        // empty kind-filtered read re-reads the graph unfiltered so the count
+        // reported for "the graph" is measured rather than assumed.
+        const unfiltered =
+          kind && entities.length === 0
+            ? await entityStore.list({ limit })
+            : null;
         return reply({
           success: true,
-          text:
-            entities.length === 0
-              ? "No entities in the graph yet."
-              : `${entities.length} entit${entities.length === 1 ? "y" : "ies"} in the graph.`,
+          text: listScopeText({ entities, kind, limit, unfiltered }),
           data: { op, entities: entities.map(entitySummary) },
         });
       }

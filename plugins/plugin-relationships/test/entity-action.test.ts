@@ -211,6 +211,44 @@ describe("KNOWLEDGE_GRAPH action", () => {
     );
   });
 
+  it("names the kind filter and the unfiltered graph on a kind-scoped miss", async () => {
+    stores.entityStore.list = vi.fn(
+      async (filter: { type?: string; limit: number }) =>
+        filter.type === "organization"
+          ? []
+          : [makeEntity(), makeEntity({ entityId: "ent_2" })],
+    );
+    const result = await call({ op: "list", kind: "organization" });
+    expect(result?.success).toBe(true);
+    // A kind-scoped miss is not an empty graph.
+    expect(result?.text).not.toBe("No entities in the graph yet.");
+    expect(result?.text).toContain('No entities of kind "organization"');
+    expect(result?.text).toContain("2 entities of other kinds");
+  });
+
+  it("says the graph is empty only when the unfiltered read is also empty", async () => {
+    stores.entityStore.list = vi.fn(async () => []);
+    const result = await call({ op: "list", kind: "organization" });
+    expect(result?.text).toContain("no entities of any kind yet");
+  });
+
+  it("marks a page-filling list as capped rather than a total", async () => {
+    stores.entityStore.list = vi.fn(async () =>
+      Array.from({ length: 50 }, (_, index) =>
+        makeEntity({ entityId: `ent_${index}` }),
+      ),
+    );
+    const result = await call({ op: "list" });
+    expect(result?.text).toContain("capped at 50");
+    expect(result?.text).not.toBe("50 entities in the graph.");
+  });
+
+  it("reports a short unfiltered list as the plain total", async () => {
+    const result = await call({ op: "list" });
+    expect(result?.text).toBe("1 entity in the graph.");
+    expect(stores.entityStore.list).toHaveBeenCalledTimes(1);
+  });
+
   it("log_interaction records on the entity", async () => {
     const result = await call({
       op: "log_interaction",

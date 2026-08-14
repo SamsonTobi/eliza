@@ -27,10 +27,19 @@ export const RELATIONSHIPS_SERVICE_TYPE = "relationships";
  */
 export const RELATIONSHIPS_ACTION_NAME = "KNOWLEDGE_GRAPH";
 
+// Canonical `FirstPartyAgentContext` values only. "people" and "relationships"
+// are not contexts the runtime defines — `AgentContext` widens to
+// `string & {}`, so they type-checked silently while Stage-1 could never emit
+// them, leaving the graph action and the ENTITY_GRAPH provider gated on
+// "contacts" alone and effectively unreachable (live: a relationship question
+// routed to CONTACT and the graph was never consulted). These mirror the
+// sibling CONTACT/ENTITY registrations plus `knowledge`, which is what a
+// knowledge graph actually serves.
 export const RELATIONSHIPS_CONTEXTS = [
-  "people",
   "contacts",
-  "relationships",
+  "entity",
+  "knowledge",
+  "memory",
 ] as const;
 export type RelationshipsContext = (typeof RELATIONSHIPS_CONTEXTS)[number];
 
