@@ -27,6 +27,9 @@ import {
 // ships with whichever build consumes this source; a public/ path depends on
 // the host app's asset-sync allowlist and 404s when it drifts.
 import elizaLogotextUrl from "@/assets/eliza-logotext.svg";
+// Same reason: the phone-mockup avatar is bundled so it ships with this source
+// instead of relying on the app's HOMEPAGE_PUBLIC_ASSETS allowlist.
+import phoneAvatarUrl from "@/assets/logo_white_orangebg.svg";
 import {
   buildElizaDiscordHref,
   buildElizaTelegramHref,
@@ -371,7 +374,7 @@ function PhoneMockup({
             <span className="landing-phone-contact">
               <img
                 className="landing-phone-avatar"
-                src="/brand/logos/logo_white_orangebg.svg"
+                src={phoneAvatarUrl}
                 alt=""
                 width={423}
                 height={423}

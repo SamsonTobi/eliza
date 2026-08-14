@@ -4,6 +4,9 @@
  */
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+// Bundled (not a public/ path) so the wordmark ships with this source and
+// cannot drift out of the app's HOMEPAGE_PUBLIC_ASSETS allowlist.
+import wordmarkBlackUrl from "@/assets/eliza_wordmark_black.svg";
 import {
   clearRememberedReturnTo,
   rememberReturnTo,
@@ -45,7 +48,7 @@ export default function LoginPage() {
           className="app-brand"
         >
           <img
-            src="/brand/logos/eliza_wordmark_black.svg"
+            src={wordmarkBlackUrl}
             alt={t("homepage_eliza.common.brandAlt", { defaultValue: "Eliza" })}
             width={512}
             height={216}

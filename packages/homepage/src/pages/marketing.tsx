@@ -13,6 +13,10 @@ import {
   Smartphone,
   Store,
 } from "lucide-react";
+import wordmarkBlackUrl from "@/assets/eliza_wordmark_black.svg";
+// Bundled (not public/ paths) so the wordmarks ship with this source and cannot
+// drift out of the app's HOMEPAGE_PUBLIC_ASSETS allowlist.
+import wordmarkWhiteUrl from "@/assets/eliza_wordmark_white.svg";
 import { releaseData } from "@/generated/release-data";
 import { isReleaseAvailable } from "@/lib/release-availability";
 import { useT } from "@/providers/I18nProvider";
@@ -147,7 +151,7 @@ export default function MarketingPage() {
           className="app-brand"
         >
           <img
-            src="/brand/logos/eliza_wordmark_black.svg"
+            src={wordmarkBlackUrl}
             alt={t("homepage_eliza.common.brandAlt", { defaultValue: "Eliza" })}
             width={512}
             height={216}
@@ -512,7 +516,7 @@ export default function MarketingPage() {
       <footer className="app-footer">
         <div className="app-footer-inner">
           <img
-            src="/brand/logos/eliza_wordmark_white.svg"
+            src={wordmarkWhiteUrl}
             alt={t("homepage_eliza.common.brandAlt", { defaultValue: "Eliza" })}
             width={512}
             height={216}
