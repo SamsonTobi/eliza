@@ -241,13 +241,20 @@ describe("BrowserWorkspaceView fullscreen chrome (Notes/Calendar parity)", () =>
     const nav = toolbar.firstElementChild as HTMLElement | null;
     expect(nav).not.toBeNull();
     expect(nav?.className).toContain("grid-cols-");
-    expect(nav?.className).toContain("sm:grid-cols-");
+    expect(nav?.className).toContain("md:grid-cols-");
+    expect(nav?.className).not.toContain("sm:grid-cols-");
     expect(nav?.className).toContain("gap-1");
     expect(nav?.className).toContain("py-1");
 
     expect(
       screen.getByTestId("browser-workspace-address-input").className,
     ).toContain("col-span-2");
+    expect(
+      screen.getByTestId("browser-workspace-address-input").className,
+    ).toContain("md:col-span-1");
+    expect(
+      screen.getByTestId("browser-workspace-address-input").className,
+    ).not.toContain("sm:col-span-1");
     for (const control of toolbar.querySelectorAll("button, input")) {
       expect(control.className).toMatch(/(?:h-11|min-h-11)/);
     }

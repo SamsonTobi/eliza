@@ -66,6 +66,7 @@ import {
   formatWeiForDisplay,
   truncateMessageForDisplay,
 } from "./browser-wallet-consent-format";
+import { BROWSER_WORKSPACE_TOOLBAR_NAV_CLASS } from "./browser-workspace-toolbar-layout";
 import {
   type BrowserWorkspaceWalletState,
   buildBrowserWorkspaceWalletState,
@@ -2589,7 +2590,7 @@ export function BrowserWorkspaceView(): React.JSX.Element {
   });
 
   const navNode = (
-    <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_repeat(3,2.75rem)] items-center gap-1 px-1.5 py-1 sm:grid-cols-[2.75rem_minmax(10rem,4fr)_repeat(3,2.75rem)_minmax(10rem,5fr)_repeat(2,2.75rem)] sm:gap-1.5 sm:px-2 sm:py-1.5 lg:gap-2 lg:px-3 lg:py-2">
+    <div className={BROWSER_WORKSPACE_TOOLBAR_NAV_CLASS}>
       <TooltipHint
         content={t("common.backToLauncher", {
           defaultValue: "Back to launcher",
@@ -2727,7 +2728,7 @@ export function BrowserWorkspaceView(): React.JSX.Element {
         })}
         data-testid="browser-workspace-address-input"
         disabled={busyAction !== null || selectedTabIsInternal}
-        className="col-span-2 h-11 min-w-[10rem] flex-1 rounded-full border-transparent bg-card/70 px-4 text-sm text-txt shadow-inset sm:col-span-1"
+        className="col-span-2 h-11 min-w-[10rem] flex-1 rounded-full border-transparent bg-card/70 px-4 text-sm text-txt shadow-inset md:col-span-1"
       />
       <BrowserNavButton
         agentId="go"
